@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<parent>
+		<groupId>cl.kanopus</groupId>
+		<artifactId>kanopus-core-parent</artifactId>
+		<version>4.04.0</version>
+	</parent>
+
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>cl.kanopus.util</groupId>
+	<artifactId>klib-rest-template</artifactId>
+	<packaging>jar</packaging>
+	<name>klib-rest-template</name>
+
+	<properties>
+		<maven.test.skip>false</maven.test.skip>
+		<license.skip>false</license.skip>
+		<jacoco.minimum.coverage>0.70</jacoco.minimum.coverage>
+	</properties>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>cl.kanopus.util</groupId>
+			<artifactId>klib-common</artifactId>
+		</dependency>
+
+		<!-- Spring Boot Web (includes RestTemplate and WebClient) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- Uses Apache HttpClient 5.x for compatibility with org.apache.hc.* -->
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+		</dependency>
+
+	</dependencies>
+
+</project>
