@@ -33,7 +33,8 @@ public class ErrorMessage {
     private String message;
     private String path;
 
-    public ErrorMessage() {}
+    public ErrorMessage() {
+    }
 
     public ErrorMessage(Date timestamp, int status, String error, String message, String path) {
         this.timestamp = timestamp;

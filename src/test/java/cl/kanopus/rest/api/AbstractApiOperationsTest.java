@@ -61,17 +61,11 @@ class AbstractApiOperationsTest {
         ExposedApi api = new ExposedApi("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.createServer(api.restTemplate());
 
-        server.expect(requestTo("http://localhost/resource/1"))
-                .andExpect(method(HttpMethod.DELETE))
-                .andRespond(withSuccess("deleted", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/resource/1")).andExpect(method(HttpMethod.DELETE)).andRespond(withSuccess("deleted", MediaType.TEXT_PLAIN));
 
-        server.expect(requestTo("http://localhost/resource"))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/resource")).andExpect(method(HttpMethod.POST)).andRespond(withSuccess("", MediaType.TEXT_PLAIN));
 
-        server.expect(requestTo("http://localhost/resource/1"))
-                .andExpect(method(HttpMethod.PUT))
-                .andRespond(withSuccess("", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/resource/1")).andExpect(method(HttpMethod.PUT)).andRespond(withSuccess("", MediaType.TEXT_PLAIN));
 
         String deleted = api.sendDelete("/resource/1", String.class);
         api.sendPost("/resource", Map.of("name", "book"));
@@ -86,25 +80,18 @@ class AbstractApiOperationsTest {
         ExposedApi api = new ExposedApi("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.createServer(api.restTemplate());
 
-        server.expect(requestTo("http://localhost/forms"))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/forms")).andExpect(method(HttpMethod.POST)).andRespond(withSuccess("", MediaType.TEXT_PLAIN));
 
-        server.expect(requestTo("http://localhost/products"))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("created", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/products")).andExpect(method(HttpMethod.POST)).andRespond(withSuccess("created", MediaType.TEXT_PLAIN));
 
-        server.expect(requestTo("http://localhost/products/1"))
-                .andExpect(method(HttpMethod.PUT))
-                .andRespond(withSuccess("updated", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/products/1")).andExpect(method(HttpMethod.PUT)).andRespond(withSuccess("updated", MediaType.TEXT_PLAIN));
 
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("code", "A-01");
 
         api.sendPostMap("/forms", form);
         String postResult = api.sendPost("/products", Map.of("name", "book"), String.class);
-        String putResult =
-                api.exposeTypedPut("/products/1", Map.of("name", "book-2"), String.class);
+        String putResult = api.exposeTypedPut("/products/1", Map.of("name", "book-2"), String.class);
 
         assertEquals("created", postResult);
         assertEquals("updated", putResult);
@@ -120,22 +107,14 @@ class AbstractApiOperationsTest {
         params.put("page", 1);
         params.put("size", 20);
 
-        server.expect(requestTo("http://localhost/search?page=1&size=20"))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("result", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/search?page=1&size=20")).andExpect(method(HttpMethod.GET)).andRespond(withSuccess("result", MediaType.TEXT_PLAIN));
 
-        server.expect(requestTo("http://localhost/create?page=1&size=20"))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("posted", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/create?page=1&size=20")).andExpect(method(HttpMethod.POST)).andRespond(withSuccess("posted", MediaType.TEXT_PLAIN));
 
-        String getResult =
-                api.sendGet("/search", new ParameterizedTypeReference<String>() {}, params);
-        String postResult =
-                api.sendPost(
-                        "/create",
-                        Map.of("name", "x"),
-                        new ParameterizedTypeReference<String>() {},
-                        params);
+        String getResult = api.sendGet("/search", new ParameterizedTypeReference<String>() {
+        }, params);
+        String postResult = api.sendPost("/create", Map.of("name", "x"), new ParameterizedTypeReference<String>() {
+        }, params);
 
         assertEquals("result", getResult);
         assertEquals("posted", postResult);
@@ -147,11 +126,10 @@ class AbstractApiOperationsTest {
         ExposedApi api = new ExposedApi("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.createServer(api.restTemplate());
 
-        server.expect(requestTo("http://localhost/ping"))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("pong", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/ping")).andExpect(method(HttpMethod.GET)).andRespond(withSuccess("pong", MediaType.TEXT_PLAIN));
 
-        String response = api.sendGet("/ping", new ParameterizedTypeReference<String>() {});
+        String response = api.sendGet("/ping", new ParameterizedTypeReference<String>() {
+        });
 
         assertEquals("pong", response);
         server.verify();
@@ -169,14 +147,11 @@ class AbstractApiOperationsTest {
         when(searcher.getSortField()).thenReturn("name");
         when(searcher.getSortOrder()).thenReturn(SortOrder.ASCENDING);
 
-        server.expect(
-                        requestTo(
-                                "http://localhost/items?limit=15&offset=30&sortField=name&sortOrder=ASCENDING"))
-                .andExpect(method(HttpMethod.GET))
+        server.expect(requestTo("http://localhost/items?limit=15&offset=30&sortField=name&sortOrder=ASCENDING")).andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("rows", MediaType.TEXT_PLAIN));
 
-        String response =
-                api.sendGet("/items", new ParameterizedTypeReference<String>() {}, searcher);
+        String response = api.sendGet("/items", new ParameterizedTypeReference<String>() {
+        }, searcher);
 
         assertEquals("rows", response);
         server.verify();
@@ -216,9 +191,7 @@ class AbstractApiOperationsTest {
         ExposedApi api = new ExposedApi("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.createServer(api.restTemplate());
 
-        server.expect(requestTo("http://localhost/shortcut"))
-                .andExpect(method(HttpMethod.PUT))
-                .andRespond(withSuccess("", MediaType.TEXT_PLAIN));
+        server.expect(requestTo("http://localhost/shortcut")).andExpect(method(HttpMethod.PUT)).andRespond(withSuccess("", MediaType.TEXT_PLAIN));
 
         api.sendPut("/shortcut");
 
@@ -237,13 +210,7 @@ class AbstractApiOperationsTest {
         ClientHttpResponse response = mock(ClientHttpResponse.class);
         when(response.getBody()).thenReturn(emptyBody());
 
-        assertDoesNotThrow(
-                () ->
-                        handler.invokeHandleError(
-                                response,
-                                HttpStatus.OK,
-                                URI.create("http://localhost/ok"),
-                                HttpMethod.GET));
+        assertDoesNotThrow(() -> handler.invokeHandleError(response, HttpStatus.OK, URI.create("http://localhost/ok"), HttpMethod.GET));
     }
 
     private InputStream emptyBody() {
@@ -303,28 +270,19 @@ class AbstractApiOperationsTest {
         }
 
         @Override
-        public <T> T sendGet(
-                String path,
-                ParameterizedTypeReference<T> responseType,
-                Map<String, Object> params) {
+        public <T> T sendGet(String path, ParameterizedTypeReference<T> responseType, Map<String, Object> params) {
             return responseType.getType() != null ? (T) nextMapResponse : null;
         }
 
         @Override
-        public <T, S extends Searcher<?>> T sendGet(
-                String path, ParameterizedTypeReference<T> responseType, S searcher) {
+        public <T, S extends Searcher<?>> T sendGet(String path, ParameterizedTypeReference<T> responseType, S searcher) {
             return responseType.getType() != null ? (T) nextSearcherResponse : null;
         }
     }
 
     private static class ExposedErrorHandler extends AbstractApi.MyApiRestTemplateErrorHandler {
 
-        void invokeHandleError(
-                ClientHttpResponse response,
-                org.springframework.http.HttpStatusCode status,
-                URI uri,
-                HttpMethod method)
-                throws Exception {
+        void invokeHandleError(ClientHttpResponse response, org.springframework.http.HttpStatusCode status, URI uri, HttpMethod method) throws Exception {
             handleError(response, status, uri, method);
         }
     }

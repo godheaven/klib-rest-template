@@ -63,9 +63,7 @@ class AbstractApiTest {
         params.put("category", "books");
         params.put("active", true);
 
-        server.expect(requestTo("http://localhost/products?category=books&active=true"))
-                .andExpect(method(HttpMethod.GET))
-                .andExpect(header(AbstractApi.KANOPUS_API_KEY, "test-key"))
+        server.expect(requestTo("http://localhost/products?category=books&active=true")).andExpect(method(HttpMethod.GET)).andExpect(header(AbstractApi.KANOPUS_API_KEY, "test-key"))
                 .andRespond(withSuccess("ok", MediaType.TEXT_PLAIN));
 
         String response = api.sendGet("/products", String.class, params);
@@ -79,16 +77,10 @@ class AbstractApiTest {
         TestApi api = new TestApi("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.createServer(api.restTemplate());
 
-        server.expect(requestTo("http://localhost/fail"))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(
-                        withStatus(HttpStatus.BAD_REQUEST)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .body(
-                                        "{\"timestamp\":null,\"status\":400,\"error\":\"Bad Request\",\"message\":\"invalid payload\",\"path\":\"/fail\"}"));
+        server.expect(requestTo("http://localhost/fail")).andExpect(method(HttpMethod.GET)).andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"timestamp\":null,\"status\":400,\"error\":\"Bad Request\",\"message\":\"invalid payload\",\"path\":\"/fail\"}"));
 
-        CustomClientException exception =
-                assertThrows(CustomClientException.class, () -> api.sendGet("/fail", String.class));
+        CustomClientException exception = assertThrows(CustomClientException.class, () -> api.sendGet("/fail", String.class));
 
         assertEquals(400, exception.getStatus().value());
         assertNotNull(exception.getDetails());
@@ -110,8 +102,7 @@ class AbstractApiTest {
         TestApi api = new TestApi("http://localhost");
 
         ParameterizedTypeReference<List<String>> listType = api.exposeTypeList(String.class);
-        ParameterizedTypeReference<Paginator<Integer>> paginatorType =
-                api.exposeTypePaginator(Integer.class);
+        ParameterizedTypeReference<Paginator<Integer>> paginatorType = api.exposeTypePaginator(Integer.class);
 
         ParameterizedType listParameterizedType = (ParameterizedType) listType.getType();
         ParameterizedType paginatorParameterizedType = (ParameterizedType) paginatorType.getType();

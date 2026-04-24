@@ -46,8 +46,7 @@ class ExceptionModelTest {
 
     @Test
     void customClientExceptionExposesStatusDetailsAndMessage() {
-        ErrorMessage details =
-                new ErrorMessage(new Date(0), 404, "Not Found", "resource missing", "/products/10");
+        ErrorMessage details = new ErrorMessage(new Date(0), 404, "Not Found", "resource missing", "/products/10");
 
         CustomClientException exception = new CustomClientException(HttpStatus.NOT_FOUND, details);
 
