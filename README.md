@@ -27,7 +27,7 @@ Add the dependency to your `pom.xml`:
 <dependency>
 	<groupId>cl.kanopus.util</groupId>
 	<artifactId>klib-rest-template</artifactId>
-	<version>4.06.0</version>
+	<version>4.06.3</version>
 </dependency>
 ```
 
