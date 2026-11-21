@@ -26,7 +26,7 @@
 	<properties>
 		<maven.test.skip>false</maven.test.skip>
 		<license.skip>false</license.skip>
-		<jacoco.minimum.coverage>0.70</jacoco.minimum.coverage>
+		<jacoco.minimum.coverage>0.85</jacoco.minimum.coverage>
 	</properties>
 
 	<dependencies>
@@ -36,10 +36,17 @@
 			<artifactId>klib-common</artifactId>
 		</dependency>
 
-		<!-- Spring Boot Web (includes RestTemplate and WebClient) -->
+		<!-- Spring Web (RestClient / RestTemplate). Spring Boot is not required, so the
+		     starter (which pulls an embedded Tomcat) is intentionally not used. -->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+
+		<!-- Jackson 3: JSON message conversion and error body parsing -->
+		<dependency>
+			<groupId>tools.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
 		<!-- Uses Apache HttpClient 5.x for compatibility with org.apache.hc.* -->
