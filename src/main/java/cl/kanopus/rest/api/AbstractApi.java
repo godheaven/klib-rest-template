@@ -25,29 +25,12 @@ package cl.kanopus.rest.api;
 
 import cl.kanopus.common.data.Paginator;
 import cl.kanopus.common.data.Searcher;
-import cl.kanopus.common.util.GsonUtils;
 import cl.kanopus.rest.api.exception.CustomClientException;
-import cl.kanopus.rest.api.exception.ErrorMessage;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.net.URI;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-import javax.net.ssl.SSLContext;
 import org.apache.hc.client5.http.classic.HttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
-import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
-import org.apache.hc.client5.http.ssl.TrustAllStrategy;
-import org.apache.hc.core5.ssl.SSLContexts;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,162 +40,136 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
-public abstract class AbstractApi {
-    private static final Logger log = LoggerFactory.getLogger(MyApiRestTemplateErrorHandler.class);
+/**
+ * Base class for typed REST clients built on {@link RestTemplate}.
+ *
+ * @deprecated since 4.20.0: {@link RestTemplate} is deprecated for removal in Spring Framework 7.1. Extend {@link AbstractRestClientApi} (based on {@link org.springframework.web.client.RestClient}) instead; it offers the same helper methods. This class will be removed in the next Spring Boot line
+ *             (4.30.0).
+ */
+@Deprecated(since = "4.20.0", forRemoval = true)
+@SuppressWarnings("removal")
+public abstract class AbstractApi implements AutoCloseable {
+    private static final Logger log = LoggerFactory.getLogger(AbstractApi.class);
     protected final RestTemplate client;
     private final String url;
+    private final HttpComponentsClientHttpRequestFactory requestFactory;
 
     public static final String KANOPUS_API_KEY = "X-API-Key";
 
     protected AbstractApi(String url) {
-        this(url, false);
+        this(url, HttpClientOptions.defaults());
     }
 
+    /**
+     * @param allowUntrustedCertificates
+     *            when {@code true}, every TLS certificate is trusted and hostname verification is disabled (insecure, logs a warning).
+     * @deprecated since 4.20.0: trusting all certificates is insecure. Use {@link #AbstractApi(String, HttpClientOptions)} with {@link HttpClientOptions.Builder#trustStore(java.nio.file.Path, char[], String)} or a custom {@link javax.net.ssl.SSLContext}.
+     */
+    @Deprecated(since = "4.20.0", forRemoval = true)
     protected AbstractApi(String url, boolean allowUntrustedCertificates) {
+        this(url, HttpClientOptions.defaults(), allowUntrustedCertificates);
+    }
+
+    /**
+     * @param options
+     *            timeouts and TLS configuration (trust store / SSL context).
+     */
+    protected AbstractApi(String url, HttpClientOptions options) {
+        this(url, options, false);
+    }
+
+    private AbstractApi(String url, HttpClientOptions options, boolean allowUntrustedCertificates) {
         this.url = url;
-        this.client = new RestTemplate(createRequestFactory(allowUntrustedCertificates));
+        this.requestFactory = new HttpComponentsClientHttpRequestFactory(createHttpClient(options, allowUntrustedCertificates));
+        this.client = new RestTemplate(requestFactory);
         this.client.setErrorHandler(new MyApiRestTemplateErrorHandler());
     }
 
     protected abstract HttpHeaders createHeaders();
 
-    public void sendDelete(String path) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<String> entity = new HttpEntity<>(headers);
+    /** Closes the underlying HTTP client and its connection pool. Spring calls it automatically for beans. */
+    @Override
+    public void close() {
+        try {
+            requestFactory.destroy();
+        } catch (Exception e) {
+            log.debug("Error closing HttpClient", e);
+        }
+    }
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        client.exchange(builder.build().toUri(), HttpMethod.DELETE, entity, String.class);
+    public void sendDelete(String path) throws CustomClientException {
+        client.exchange(UriSupport.build(url, path), HttpMethod.DELETE, new HttpEntity<>(createHeaders()), String.class);
     }
 
     public <T> T sendDelete(String path, Class<T> responseType) {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.DELETE, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path), HttpMethod.DELETE, new HttpEntity<>(createHeaders()), responseType);
         return response.getBody();
     }
 
     public void sendPost(String path, Object request) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Object> entity = new HttpEntity<>(request, headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        client.postForLocation(builder.build().toUri(), entity);
+        client.postForLocation(UriSupport.build(url, path), new HttpEntity<>(request, createHeaders()));
     }
 
     public <T> T sendPost(String path, Object request, ParameterizedTypeReference<T> responseType, Map<String, Object> params) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Object> entity = new HttpEntity<>(request, headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        for (Map.Entry<String, Object> m : params.entrySet()) {
-            builder.queryParam(m.getKey(), m.getValue());
-        }
-
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.POST, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path, params), HttpMethod.POST, new HttpEntity<>(request, createHeaders()), responseType);
         return response.getBody();
     }
 
     public void sendPostMap(String path, MultiValueMap<String, Object> params) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(params, headers);
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        client.postForLocation(builder.build().toUri(), entity);
+        client.postForLocation(UriSupport.build(url, path), new HttpEntity<>(params, createHeaders()));
     }
 
+    /** Sends a PUT request without a body. */
     public void sendPut(String path) throws CustomClientException {
-        sendPut(path, String.class);
+        client.put(UriSupport.build(url, path), new HttpEntity<>(createHeaders()));
     }
 
     public void sendPut(String path, Object request) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Object> entity = new HttpEntity<>(request, headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        client.put(builder.build().toUri(), entity);
+        client.put(UriSupport.build(url, path), new HttpEntity<>(request, createHeaders()));
     }
 
     protected <T> T sendPut(String path, Object request, Class<T> responseType) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Object> entity = new HttpEntity<>(request, headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.PUT, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path), HttpMethod.PUT, new HttpEntity<>(request, createHeaders()), responseType);
         return response.getBody();
     }
 
     public <T> T sendPost(String path, Object request, Class<T> responseType) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Object> entity = new HttpEntity<>(request, headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-
-        ResponseEntity<T> response = client.postForEntity(builder.build().toUri(), entity, responseType);
+        ResponseEntity<T> response = client.postForEntity(UriSupport.build(url, path), new HttpEntity<>(request, createHeaders()), responseType);
         return response.getBody();
     }
 
     public <T> T sendGet(String path, Class<T> responseType) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.GET, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path), HttpMethod.GET, new HttpEntity<>(createHeaders()), responseType);
         return response.getBody();
     }
 
     public <T> T sendGet(String path, ParameterizedTypeReference<T> responseType) throws CustomClientException {
-        HashMap<String, Object> params = new HashMap<>();
-        return sendGet(path, responseType, params);
+        return sendGet(path, responseType, Map.of());
     }
 
     public <T> T sendGet(String path, Class<T> responseType, Map<String, Object> params) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        for (Map.Entry<String, Object> m : params.entrySet()) {
-            builder.queryParam(m.getKey(), m.getValue());
-        }
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.GET, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path, params), HttpMethod.GET, new HttpEntity<>(createHeaders()), responseType);
         return response.getBody();
     }
 
     public <T> T sendGet(String path, ParameterizedTypeReference<T> responseType, Map<String, Object> params) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        for (Map.Entry<String, Object> m : params.entrySet()) {
-            builder.queryParam(m.getKey(), m.getValue());
-        }
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.GET, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path, params), HttpMethod.GET, new HttpEntity<>(createHeaders()), responseType);
         return response.getBody();
     }
 
     public <T, S extends Searcher<?>> T sendGet(String path, ParameterizedTypeReference<T> responseType, S searcher) throws CustomClientException {
-        HttpHeaders headers = createHeaders();
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url + path);
-        builder.queryParam("limit", searcher.getLimit());
-        builder.queryParam("offset", searcher.getOffset());
-        builder.queryParam("sortField", searcher.getSortField());
-        builder.queryParam("sortOrder", searcher.getSortOrder());
-        ResponseEntity<T> response = client.exchange(builder.build().toUri(), HttpMethod.GET, entity, responseType);
+        ResponseEntity<T> response = client.exchange(UriSupport.build(url, path, searcher), HttpMethod.GET, new HttpEntity<>(createHeaders()), responseType);
         return response.getBody();
     }
 
     public <T> List<T> sendGetList(String url, Class<T> clazz) throws CustomClientException {
-        return sendGet(url, typeList(clazz), new HashMap<>());
+        return sendGet(url, typeList(clazz), Map.of());
     }
 
     public <T> List<T> sendGetList(String url, Class<T> clazz, Map<String, Object> params) throws CustomClientException {
@@ -220,7 +177,7 @@ public abstract class AbstractApi {
     }
 
     public <T> Paginator<T> sendGetPaginator(String url, Class<T> clazz) throws CustomClientException {
-        return sendGet(url, typePaginator(clazz), new HashMap<>());
+        return sendGet(url, typePaginator(clazz), Map.of());
     }
 
     public <T> Paginator<T> sendGetPaginator(String url, Class<T> clazz, Map<String, Object> params) throws CustomClientException {
@@ -232,97 +189,51 @@ public abstract class AbstractApi {
     }
 
     protected <T> ParameterizedTypeReference<Paginator<T>> typePaginator(Class<T> clazz) {
-        return new ParameterizedTypeReference<Paginator<T>>() {
-            @Override
-            public Type getType() {
-                return new MyParameterizedTypeImpl((ParameterizedType) super.getType(), new Type[]{clazz});
-            }
-        };
+        return TypeReferences.paginatorOf(clazz);
     }
 
     protected <T> ParameterizedTypeReference<List<T>> typeList(Class<T> clazz) {
-        return new ParameterizedTypeReference<List<T>>() {
-            @Override
-            public Type getType() {
-                return new MyParameterizedTypeImpl((ParameterizedType) super.getType(), new Type[]{clazz});
-            }
-        };
+        return TypeReferences.listOf(clazz);
     }
 
-    private ClientHttpRequestFactory createRequestFactory(boolean allowUntrustedCertificates) {
-        try {
-            HttpClient httpClient = allowUntrustedCertificates ? createHttpClientAcceptsUntrustedCerts() : HttpClients.custom().build();
-            return new HttpComponentsClientHttpRequestFactory(httpClient);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+    private HttpClient createHttpClient(HttpClientOptions options, boolean allowUntrustedCertificates) {
+        if (allowUntrustedCertificates) {
+            log.warn("{} is configured to trust ALL TLS certificates and to skip hostname verification. This is insecure and must not be used in production; "
+                    + "configure a trust store with HttpClientOptions instead.", getClass().getName());
+            return createHttpClientAcceptsUntrustedCerts();
         }
+        return HttpClientSupport.createHttpClient(options);
     }
 
     /**
-     * Creates an HttpClient that trusts all certificates.
+     * Creates an HttpClient that trusts all certificates and disables hostname verification.
      *
      * <p>
      * Security warning: use this only in non-production environments.
      *
      * <p>
      * This method is {@code protected} so subclasses can override the SSL strategy when needed. Keep overrides side-effect free because it may be invoked during base initialization.
+     *
+     * @deprecated since 4.20.0: insecure. Supply a trust store or {@link javax.net.ssl.SSLContext} through {@link HttpClientOptions}.
      */
+    @Deprecated(since = "4.20.0", forRemoval = true)
     protected HttpClient createHttpClientAcceptsUntrustedCerts() {
-        try {
-            // 1. Create an SSLContext that trusts all certificates
-            SSLContext sslContext = SSLContexts.custom().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build();
-
-            // 2. Create a SocketFactory with hostname verification disabled
-            SSLConnectionSocketFactory sslSocketFactory = SSLConnectionSocketFactoryBuilder.create().setSslContext(sslContext).setHostnameVerifier(NoopHostnameVerifier.INSTANCE).build();
-
-            // 3. Create the ConnectionManager using the socket factory
-            PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create().setSSLSocketFactory(sslSocketFactory).build();
-
-            // 4. Build the final client
-            return HttpClients.custom().setConnectionManager(connectionManager).build();
-        } catch (Exception e) {
-            throw new RuntimeException("Error creating HttpClient that trusts untrusted certificates", e);
-        }
+        return HttpClientSupport.createTrustAllHttpClient(HttpClientOptions.defaults());
     }
 
+    /**
+     * Maps HTTP error responses to {@link CustomClientException}.
+     *
+     * @deprecated since 4.20.0 together with {@link AbstractApi}; {@link AbstractRestClientApi} handles errors with a {@code RestClient} status handler.
+     */
+    @Deprecated(since = "4.20.0", forRemoval = true)
     public static class MyApiRestTemplateErrorHandler extends DefaultResponseErrorHandler {
 
         @Override
         protected void handleError(@NonNull ClientHttpResponse response, HttpStatusCode statusCode, URI url, HttpMethod method) throws IOException {
             if (statusCode.isError()) {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.getBody()))) {
-                    String json = reader.lines().collect(Collectors.joining(""));
-                    ErrorMessage errorMessage = GsonUtils.custom.fromJson(json, ErrorMessage.class);
-                    log.error("API Error: {} - {}", statusCode, errorMessage);
-                    throw new CustomClientException(statusCode, errorMessage);
-                }
+                throw ErrorResponses.toException(response, statusCode, method, url, log);
             }
-        }
-    }
-
-    private static class MyParameterizedTypeImpl implements ParameterizedType {
-
-        private final ParameterizedType delegate;
-        private final Type[] actualTypeArguments;
-
-        MyParameterizedTypeImpl(ParameterizedType delegate, Type[] actualTypeArguments) {
-            this.delegate = delegate;
-            this.actualTypeArguments = actualTypeArguments;
-        }
-
-        @Override
-        public Type[] getActualTypeArguments() {
-            return actualTypeArguments;
-        }
-
-        @Override
-        public Type getRawType() {
-            return delegate.getRawType();
-        }
-
-        @Override
-        public Type getOwnerType() {
-            return delegate.getOwnerType();
         }
     }
 }

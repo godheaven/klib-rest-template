@@ -52,6 +52,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
+@SuppressWarnings("removal")
 class AbstractApiTest {
 
     @Test
