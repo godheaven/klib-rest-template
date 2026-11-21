@@ -24,8 +24,11 @@
 package cl.kanopus.rest.api.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.time.Duration;
 import java.util.Date;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -100,6 +103,51 @@ class ExceptionModelTest {
         DummyErrorCode code = new DummyErrorCode("Base message");
 
         assertEquals("Base message", code.getMessage());
+    }
+
+    @Test
+    void errorCodeDoesNotLoopWhenArgumentContainsItsOwnPlaceholder() {
+        DummyErrorCode code = new DummyErrorCode("value={0}, other={1}");
+
+        String message = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> code.getMessage("{0}", "{1}{0}"));
+
+        assertEquals("value={0}, other={1}{0}", message);
+    }
+
+    @Test
+    void errorCodeKeepsUnknownOrMalformedPlaceholders() {
+        DummyErrorCode code = new DummyErrorCode("{0} {1} {x} {} { {0");
+
+        assertEquals("a {1} {x} {} { {0", code.getMessage("a"));
+        assertEquals("null {1} {x} {} { {0", code.getMessage((Object) null));
+        assertEquals("{0} {1} {x} {} { {0", code.getMessage((Object[]) null));
+        assertEquals("{0} {1} {x} {} { {0", code.getMessage(new Object[0]));
+        assertEquals("{99999999999}", new DummyErrorCode("{99999999999}").getMessage("a"));
+    }
+
+    @Test
+    void errorCodeWithNullMessageIsSafe() {
+        assertNull(new DummyErrorCode(null).getMessage("a"));
+    }
+
+    @Test
+    void customClientExceptionToleratesNullDetails() {
+        CustomClientException exception = new CustomClientException(HttpStatus.BAD_GATEWAY, null);
+
+        assertNull(exception.getDetails());
+        assertNull(exception.getResponseBody());
+        assertEquals("HTTP 502", exception.getMessage());
+        assertNull(new CustomClientException(null, null).getMessage());
+    }
+
+    @Test
+    void customClientExceptionFallsBackToErrorAndKeepsRawBody() {
+        ErrorMessage details = new ErrorMessage(null, 500, "Internal Server Error", null, "/x");
+
+        CustomClientException exception = new CustomClientException(HttpStatus.INTERNAL_SERVER_ERROR, details, "<html/>");
+
+        assertEquals("Internal Server Error", exception.getMessage());
+        assertEquals("<html/>", exception.getResponseBody());
     }
 
     private static final class DummyErrorCode extends ErrorCode {
